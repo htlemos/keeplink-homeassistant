@@ -1,11 +1,8 @@
 """Config flow for Keeplink Switch integration."""
 import logging
 import voluptuous as vol
-import aiohttp
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
-import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN
 
@@ -21,8 +18,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Validate the connection here if you want
-            return self.async_create_entry(title=user_input[CONF_HOST], data=user_input)
+            # Prevent duplicate hosts
+            self._async_abort_entries_match({CONF_HOST: user_input[CONF_HOST]})
+            
+            return self.async_create_entry(
+                title=f"Keeplink ({user_input[CONF_HOST]})", 
+                data=user_input
+            )
 
         return self.async_show_form(
             step_id="user",

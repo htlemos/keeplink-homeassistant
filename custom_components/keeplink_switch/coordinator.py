@@ -25,26 +25,24 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         self.username = username
         self.password = password
         self.session = session
-        
-        # Calculate the Auth Hash once (since user/pass don't change)
-        # Logic: MD5(username + password)
+        self.mac_address = None # Store MAC specifically for device ID
+        self.device_info = {}   # Store static info for the registry
+
+        # Calculate Auth Hash
         auth_str = f"{username}{password}"
         self.auth_cookie = hashlib.md5(auth_str.encode()).hexdigest()
 
         super().__init__(
             hass,
             _LOGGER,
-            name=DOMAIN,
+            name=f"Keeplink Switch ({host})",
             update_interval=timedelta(seconds=60),
         )
 
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
         try:
-            # We use the /info.cgi endpoint
             url = f"http://{self.host}/info.cgi"
-            
-            # Mimic the headers/cookies we found in your research
             headers = {
                 "Referer": f"http://{self.host}/login.cgi",
                 "User-Agent": "HomeAssistant/1.0"
@@ -54,23 +52,32 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
             async with async_timeout.timeout(10):
                 response = await self.session.get(url, headers=headers, cookies=cookies)
                 
-                # Check if we got kicked to login page
                 if "login.cgi" in str(response.url):
-                     raise ConfigEntryAuthFailed("Authentication failed. Switch redirected to login.")
+                     raise ConfigEntryAuthFailed("Authentication failed.")
                 
                 html = await response.text()
                 
-            return self._parse_data(html)
+            data = self._parse_data(html)
+            
+            # Save MAC and Info for Device Registry
+            if "mac" in data:
+                self.mac_address = data["mac"]
+                self.device_info = {
+                    "manufacturer": "Keeplink",
+                    "model": data.get("model", "Unknown Model"),
+                    "sw_version": data.get("firmware", "Unknown"),
+                    "hw_version": data.get("hardware", "Unknown"),
+                }
+            
+            return data
 
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}")
 
     def _parse_data(self, html):
-        """Parse the HTML table using BeautifulSoup."""
+        """Parse HTML."""
         soup = BeautifulSoup(html, 'html.parser')
         data = {}
-        
-        # Find all table rows
         rows = soup.find_all('tr')
         for row in rows:
             cols = row.find_all(['th', 'td'])
@@ -78,7 +85,6 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 key = cols[0].get_text(strip=True)
                 value = cols[1].get_text(strip=True)
                 
-                # Map standard names to keys
                 if "Device Model" in key:
                     data["model"] = value
                 elif "Firmware Version" in key:
@@ -87,5 +93,4 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     data["mac"] = value
                 elif "Hardware Version" in key:
                     data["hardware"] = value
-                    
         return data
