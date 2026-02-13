@@ -4,13 +4,10 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-import homeassistant.helpers.config_validation as cv
+from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
 from .const import (
     DOMAIN, 
-    CONF_HOST, 
-    CONF_USERNAME, 
-    CONF_PASSWORD, 
     CONF_SCAN_INTERVAL, 
     DEFAULT_SCAN_INTERVAL
 )
@@ -26,7 +23,7 @@ class KeeplinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return KeeplinkOptionsFlowHandler(config_entry)
+        return KeeplinkOptionsFlowHandler()  # ERROR FIX: Removed argument here
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
@@ -40,7 +37,7 @@ class KeeplinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data=user_input
             )
 
-        # Default Schema for adding a new device
+        # Default Schema
         data_schema = vol.Schema({
             vol.Required(CONF_HOST): str,
             vol.Required(CONF_USERNAME, default="admin"): str,
@@ -57,9 +54,8 @@ class KeeplinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class KeeplinkOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for the Cogwheel configuration."""
 
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
+    # ERROR FIX: Removed __init__ entirely.
+    # The base class automatically handles 'self.config_entry' now.
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
@@ -71,9 +67,10 @@ class KeeplinkOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=None)
 
         # Pre-fill the form with existing values
-        current_host = self.config_entry.data.get(CONF_HOST)
-        current_user = self.config_entry.data.get(CONF_USERNAME)
-        current_pass = self.config_entry.data.get(CONF_PASSWORD)
+        # We access self.config_entry directly (it is auto-populated by HA)
+        current_host = self.config_entry.data.get(CONF_HOST, "")
+        current_user = self.config_entry.data.get(CONF_USERNAME, "admin")
+        current_pass = self.config_entry.data.get(CONF_PASSWORD, "admin")
         current_scan = self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
         options_schema = vol.Schema({
