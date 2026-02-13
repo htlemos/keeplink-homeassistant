@@ -53,11 +53,11 @@ class KeeplinkPortBinarySensor(CoordinatorEntity, BinarySensorEntity):
             "rx_errors": port_data.get("rx_errors", 0),
         }
         
-        # Adicionar info de PoE se disponível e relevante
-        if "poe_power" in port_data:
-            attributes["poe_power_w"] = port_data["poe_power"]
-            attributes["poe_voltage_v"] = port_data["poe_voltage"]
-            attributes["poe_current_ma"] = port_data["poe_current"]
+        # FIX: Using the correct keys "power", "voltage", "current"
+        if "power" in port_data:
+            attributes["poe_power_w"] = port_data["power"]
+            attributes["poe_voltage_v"] = port_data["voltage"]
+            attributes["poe_current_ma"] = port_data["current"]
             
         return attributes
 

@@ -20,13 +20,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         KeeplinkSensor(coordinator, "netmask", "Netmask", "mdi:subnet-mask"),
         KeeplinkSensor(coordinator, "gateway", "Gateway", "mdi:router"),
         KeeplinkSensor(coordinator, "firmware_date", "Firmware Date", "mdi:calendar-clock"),
-        
         # Total PoE Power
         KeeplinkPoETotalSensor(coordinator)
     ]
     
     # Add Per-Port Sensors dynamically
-    # We check the first batch of data to see how many ports we have
     if "ports" in coordinator.data:
         for port_num in coordinator.data["ports"]:
             sensors.append(KeeplinkPortSensor(coordinator, port_num, "power"))
@@ -46,13 +44,10 @@ class KeeplinkSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def name(self): return f"Keeplink {self._name}"
-    
     @property
     def native_value(self): return self.coordinator.data.get(self._key)
-    
     @property
     def icon(self): return self._icon
-    
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
@@ -72,38 +67,40 @@ class KeeplinkPoETotalSensor(KeeplinkSensor):
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        # UPDATE: Set precision to 3 decimals
         self._attr_suggested_display_precision = 3
 
 class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
-    """Sensor for Port Specific Data (Power, Voltage, Current)."""
+    """Sensor for Port Specific Data."""
     def __init__(self, coordinator, port_num, metric):
         super().__init__(coordinator)
         self.port_num = port_num
-        self.metric = metric # 'power', 'voltage', 'current'
+        self.metric = metric
         
         self._attr_unique_id = f"{coordinator.mac_address}_port{port_num}_{metric}"
         self._attr_name = f"Keeplink Port {port_num} PoE {metric.capitalize()}"
+        
+        # FEATURE: Disable these sensors by default
+        self._attr_entity_registry_enabled_default = False
         
         if metric == "power":
             self._attr_device_class = SensorDeviceClass.POWER
             self._attr_native_unit_of_measurement = UnitOfPower.WATT
             self._attr_icon = "mdi:flash"
-            # UPDATE: Set precision to 3 decimals
             self._attr_suggested_display_precision = 3
         elif metric == "voltage":
             self._attr_device_class = SensorDeviceClass.VOLTAGE
             self._attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
             self._attr_icon = "mdi:sine-wave"
-            self._attr_suggested_display_precision = 1 # Optional: nice to have 1 decimal for Volts
+            self._attr_suggested_display_precision = 1 
         elif metric == "current":
             self._attr_device_class = SensorDeviceClass.CURRENT
             self._attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
             self._attr_icon = "mdi:current-ac"
-            self._attr_suggested_display_precision = 0 # Optional: mA usually doesn't need decimals
+            self._attr_suggested_display_precision = 0 
 
     @property
     def native_value(self):
+        # FIX: Now look for simple keys (power/voltage/current) because we fixed coordinator.py
         port_data = self.coordinator.data.get("ports", {}).get(self.port_num)
         if port_data:
             return port_data.get(self.metric)
@@ -111,7 +108,4 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        # Link to the main device
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.mac_address)},
-        )
+        return DeviceInfo(identifiers={(DOMAIN, self.coordinator.mac_address)})
