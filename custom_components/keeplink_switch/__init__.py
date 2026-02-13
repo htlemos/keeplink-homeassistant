@@ -7,8 +7,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
 from .coordinator import KeeplinkCoordinator
 
-# UPDATE: Add "switch" to the list
-PLATFORMS = ["sensor", "switch", "binary_sensor"]
+# UPDATE: Add "button" to the list
+PLATFORMS = ["sensor", "switch", "binary_sensor", "button"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Keeplink Switch from a config entry."""

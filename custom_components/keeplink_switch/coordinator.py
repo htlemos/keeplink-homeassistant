@@ -225,6 +225,31 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     "rx_errors": int(cols[6].get_text(strip=True))
                 }
         return data
+    
+    async def async_clear_port_stats(self):
+        """Send command to Clear Port Statistics."""
+        # The form action is port.cgi?page=stats
+        url = f"http://{self.host}/{ENDPOINT_PORT_STATS}"
+        
+        headers = {
+            "Referer": f"http://{self.host}/{ENDPOINT_PORT_STATS}",
+            "User-Agent": "HomeAssistant/1.0"
+        }
+        cookies = {"admin": self.auth_cookie}
+        
+        # Payload observed: submit=+++Clear+++&cmd=stats
+        # In Python, we use the actual string "   Clear   " and let the library encode the spaces to +
+        payload = {
+            "submit": "   Clear   ", 
+            "cmd": "stats"
+        }
+        
+        try:
+            await self.session.post(url, headers=headers, cookies=cookies, data=payload)
+            # Force immediate refresh so the sensors go back to 0 immediately
+            await self.async_request_refresh()
+        except aiohttp.ClientError as err:
+            _LOGGER.error(f"Failed to clear statistics: {err}")
 
     async def async_set_poe_state(self, port_num, state):
         """Set PoE State."""
