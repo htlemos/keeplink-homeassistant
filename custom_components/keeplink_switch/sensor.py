@@ -72,6 +72,8 @@ class KeeplinkPoETotalSensor(KeeplinkSensor):
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        # UPDATE: Set precision to 3 decimals
+        self._attr_suggested_display_precision = 3
 
 class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
     """Sensor for Port Specific Data (Power, Voltage, Current)."""
@@ -87,14 +89,18 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
             self._attr_device_class = SensorDeviceClass.POWER
             self._attr_native_unit_of_measurement = UnitOfPower.WATT
             self._attr_icon = "mdi:flash"
+            # UPDATE: Set precision to 3 decimals
+            self._attr_suggested_display_precision = 3
         elif metric == "voltage":
             self._attr_device_class = SensorDeviceClass.VOLTAGE
             self._attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
             self._attr_icon = "mdi:sine-wave"
+            self._attr_suggested_display_precision = 1 # Optional: nice to have 1 decimal for Volts
         elif metric == "current":
             self._attr_device_class = SensorDeviceClass.CURRENT
             self._attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
             self._attr_icon = "mdi:current-ac"
+            self._attr_suggested_display_precision = 0 # Optional: mA usually doesn't need decimals
 
     @property
     def native_value(self):

@@ -13,3 +13,6 @@ DEFAULT_SCAN_INTERVAL = 60
 ENDPOINT_INFO = "info.cgi"
 ENDPOINT_PSE_SYSTEM = "pse_system.cgi"
 ENDPOINT_PSE_PORT = "pse_port.cgi"
+# NOVOS
+ENDPOINT_PORT_SETTINGS = "port.cgi"
+ENDPOINT_PORT_STATS = "port.cgi?page=stats"

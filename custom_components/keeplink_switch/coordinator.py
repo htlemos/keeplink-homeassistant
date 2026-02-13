@@ -12,7 +12,14 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
-from .const import DOMAIN, ENDPOINT_INFO, ENDPOINT_PSE_SYSTEM, ENDPOINT_PSE_PORT
+from .const import (
+    DOMAIN, 
+    ENDPOINT_INFO, 
+    ENDPOINT_PSE_SYSTEM, 
+    ENDPOINT_PSE_PORT,
+    ENDPOINT_PORT_SETTINGS,
+    ENDPOINT_PORT_STATS
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,7 +48,7 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data from API endpoints."""
-        data = {}
+        data = {"ports": {}} # Inicializa estrutura de portas
         headers = {
             "Referer": f"http://{self.host}/login.cgi",
             "User-Agent": "HomeAssistant/1.0"
@@ -49,17 +56,31 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         cookies = {"admin": self.auth_cookie}
 
         try:
-            async with async_timeout.timeout(20): # Increased timeout for multiple requests
-                # 1. Fetch System Info
+            async with async_timeout.timeout(20):
+                # 1. Info e PoE (Mantemos o que já tínhamos)
                 data.update(await self._fetch_page(ENDPOINT_INFO, headers, cookies, self._parse_info))
                 
-                # 2. Fetch Total PoE Consumption
-                data.update(await self._fetch_page(ENDPOINT_PSE_SYSTEM, headers, cookies, self._parse_pse_system))
+                # PoE System e Port já parseiam para dentro de data["ports"] se a estrutura existir
+                # Mas as funções antigas assumiam que data["ports"] era criado lá.
+                # Vamos garantir que as funções de parse atualizam o dicionário existente.
                 
-                # 3. Fetch Port PoE Data
-                data.update(await self._fetch_page(ENDPOINT_PSE_PORT, headers, cookies, self._parse_pse_port))
+                # Fetch PoE System
+                poe_sys_data = await self._fetch_page(ENDPOINT_PSE_SYSTEM, headers, cookies, self._parse_pse_system)
+                data.update(poe_sys_data)
 
-                # Update Device Info if MAC is found
+                # Fetch PoE Port (Esta função precisa de cuidado para fazer merge)
+                poe_port_data = await self._fetch_page(ENDPOINT_PSE_PORT, headers, cookies, self._parse_pse_port)
+                self._deep_merge_ports(data, poe_port_data)
+
+                # 2. Fetch Port Settings (Velocidade/Duplex)
+                settings_data = await self._fetch_page(ENDPOINT_PORT_SETTINGS, headers, cookies, self._parse_port_settings)
+                self._deep_merge_ports(data, settings_data)
+
+                # 3. Fetch Port Stats (Link Status e Pacotes)
+                stats_data = await self._fetch_page(ENDPOINT_PORT_STATS, headers, cookies, self._parse_port_stats)
+                self._deep_merge_ports(data, stats_data)
+
+                # Update Device Info
                 if "mac" in data:
                     self.mac_address = data["mac"]
                     self.device_info = {
@@ -74,19 +95,31 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}")
 
+    def _deep_merge_ports(self, main_data, new_data):
+        """Helper para juntar dados de portas sem apagar o que já lá estava."""
+        if "ports" not in main_data:
+            main_data["ports"] = {}
+            
+        if "ports" in new_data:
+            for port, info in new_data["ports"].items():
+                if port not in main_data["ports"]:
+                    main_data["ports"][port] = {}
+                main_data["ports"][port].update(info)
+
     async def _fetch_page(self, endpoint, headers, cookies, parser_func):
         """Helper to fetch and parse a single page."""
         url = f"http://{self.host}/{endpoint}"
         response = await self.session.get(url, headers=headers, cookies=cookies)
-        
-        if "login.cgi" in str(response.url):
-             raise ConfigEntryAuthFailed("Authentication failed.")
-        
+        if "login.cgi" in str(response.url): raise ConfigEntryAuthFailed("Authentication failed.")
         html = await response.text()
         return parser_func(html)
 
+    # --- PARSERS EXISTENTES (Info, PoE System, PoE Port) MANTÊM-SE IGUAIS ---
+    # (Copie as funções _parse_info, _parse_pse_system e _parse_pse_port do código anterior)
+    # Apenas garanta que _parse_pse_port retorna {"ports": {1: {dados...}}}
+    
     def _parse_info(self, html):
-        """Parse info.cgi."""
+        # (O mesmo código de antes)
         soup = BeautifulSoup(html, 'html.parser')
         data = {}
         rows = soup.find_all('tr')
@@ -95,7 +128,6 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
             if len(cols) == 2:
                 key = cols[0].get_text(strip=True)
                 value = cols[1].get_text(strip=True)
-                
                 if "Device Model" in key: data["model"] = value
                 elif "Firmware Version" in key: data["firmware"] = value
                 elif "MAC Address" in key: data["mac"] = value
@@ -107,10 +139,9 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         return data
 
     def _parse_pse_system(self, html):
-        """Parse pse_system.cgi for Total Power."""
+        # (O mesmo código de antes)
         soup = BeautifulSoup(html, 'html.parser')
         data = {}
-        # The value is in an input tag: <input name="pse_con_pwr" value="9.435">
         input_tag = soup.find('input', {'name': 'pse_con_pwr'})
         if input_tag and input_tag.get('value'):
             try:
@@ -118,48 +149,120 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
             except ValueError:
                 pass
         return data
-
+        
     def _parse_pse_port(self, html):
-        """Parse pse_port.cgi for Per-Port Data."""
+        # (O mesmo código de antes)
         soup = BeautifulSoup(html, 'html.parser')
         data = {"ports": {}} 
-        
-        # Find the second table (the one with data, not the form)
         tables = soup.find_all('table')
-        if len(tables) < 2:
-            return data
-            
-        data_table = tables[1] # The second table has the port list
+        if len(tables) < 2: return data
+        data_table = tables[1]
         rows = data_table.find_all('tr')
-        
-        # Skip header row
         for row in rows[1:]:
             cols = row.find_all('td')
-            # Columns: 0=PortName, 1=State(Enable/Disable), 2=PowerOn/Off, 3=Type, 4=Power(W), 5=Volt(V), 6=Current(mA)
             if len(cols) >= 7:
-                port_name = cols[0].get_text(strip=True) # "Port 1"
+                port_name = cols[0].get_text(strip=True)
                 try:
                     port_num = int(port_name.replace("Port ", ""))
                 except ValueError:
                     continue
-                
-                # Parse Values (handle "-" for off ports)
-                def parse_val(text):
-                    return float(text) if text != "-" else 0.0
-
-                power_w = parse_val(cols[4].get_text(strip=True))
-                voltage_v = parse_val(cols[5].get_text(strip=True))
-                current_ma = parse_val(cols[6].get_text(strip=True))
-                state_enabled = "Enable" in cols[1].get_text(strip=True)
-                
+                def parse_val(text): return float(text) if text != "-" else 0.0
                 data["ports"][port_num] = {
-                    "power": power_w,
-                    "voltage": voltage_v,
-                    "current": current_ma,
-                    "enabled": state_enabled
+                    "poe_power": parse_val(cols[4].get_text(strip=True)),
+                    "poe_voltage": parse_val(cols[5].get_text(strip=True)),
+                    "poe_current": parse_val(cols[6].get_text(strip=True)),
+                    "poe_enabled": "Enable" in cols[1].get_text(strip=True)
                 }
         return data
 
+    # --- NOVOS PARSERS ---
+
+    def _parse_port_settings(self, html):
+        """Parse port.cgi (Settings) para obter Velocidade Negociada."""
+        soup = BeautifulSoup(html, 'html.parser')
+        data = {"ports": {}}
+        
+        # Procuramos a tabela no fundo que tem "Config" e "Actual"
+        # Esta tabela tem headers complexos (rowspan/colspan), então procuramos pelo conteúdo
+        tables = soup.find_all('table')
+        # Geralmente é a última tabela
+        target_table = tables[-1]
+        
+        rows = target_table.find_all('tr')
+        for row in rows:
+            cols = row.find_all('td')
+            # Estrutura: [Port X, State, Config, Actual(SPEED), Config, Actual(FLOW)]
+            # Exemplo Port 1: [Port 1, Enable, Auto, 1000Full, On, On]
+            if len(cols) >= 6:
+                port_text = cols[0].get_text(strip=True)
+                if "Port" not in port_text: continue
+                
+                try:
+                    port_num = int(port_text.replace("Port ", ""))
+                except ValueError: continue
+
+                actual_speed = cols[3].get_text(strip=True)
+                flow_control = cols[5].get_text(strip=True)
+                
+                data["ports"][port_num] = {
+                    "speed": actual_speed,
+                    "flow_control": flow_control
+                }
+        return data
+
+    def _parse_port_stats(self, html):
+        """Parse port.cgi?page=stats para Link Status e Tráfego."""
+        soup = BeautifulSoup(html, 'html.parser')
+        data = {"ports": {}}
+        
+        # A tabela de stats é simples
+        tables = soup.find_all('table')
+        if not tables: return data
+        
+        # Assumindo que é a primeira tabela dentro do fieldset
+        target_table = tables[0]
+        rows = target_table.find_all('tr')
+        
+        for row in rows:
+            cols = row.find_all(['td'])
+            # Estrutura: [Port 1, Enable, Link Up, TxGood, TxBad, RxGood, RxBad]
+            if len(cols) >= 7:
+                port_text = cols[0].get_text(strip=True)
+                if "Port" not in port_text: continue
+                
+                try:
+                    port_num = int(port_text.replace("Port ", ""))
+                except ValueError: continue
+
+                link_status = cols[2].get_text(strip=True) # "Link Up" ou "Link Down"
+                
+                # Função para calcular o BigInt do JS: High * 4294967296 + Low
+                def parse_bigint(text_content):
+                    if "-" in text_content:
+                        parts = text_content.split("-")
+                        try:
+                            high = int(parts[0])
+                            low = int(parts[1])
+                            return (high * 4294967296) + low
+                        except ValueError:
+                            return 0
+                    return 0
+
+                tx_good = parse_bigint(cols[3].get_text(strip=True))
+                tx_bad = int(cols[4].get_text(strip=True))
+                rx_good = parse_bigint(cols[5].get_text(strip=True))
+                rx_bad = int(cols[6].get_text(strip=True))
+
+                data["ports"][port_num] = {
+                    "link_status": link_status,
+                    "is_link_up": "Link Up" in link_status,
+                    "tx_packets": tx_good,
+                    "rx_packets": rx_good,
+                    "tx_errors": tx_bad,
+                    "rx_errors": rx_bad
+                }
+        return data
+    
     async def async_set_poe_state(self, port_num, state):
         """Send POST request to enable/disable PoE."""
         # Port 1 is ID 0, Port 2 is ID 1, etc.
