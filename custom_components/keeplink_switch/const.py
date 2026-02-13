@@ -8,3 +8,8 @@ CONF_SCAN_INTERVAL = "scan_interval"
 
 # Default update interval (1 minute)
 DEFAULT_SCAN_INTERVAL = 60
+
+# Add new endpoints
+ENDPOINT_INFO = "info.cgi"
+ENDPOINT_PSE_SYSTEM = "pse_system.cgi"
+ENDPOINT_PSE_PORT = "pse_port.cgi"
