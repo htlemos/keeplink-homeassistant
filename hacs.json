@@ -1,0 +1,8 @@
+{
+  "name": "Keeplink Network Switch",
+  "content_in_root": false,
+  "zip_release": false,
+  "filename": "keeplink_switch.zip",
+  "render_readme": true,
+  "homeassistant": "2024.1.0" 
+}
