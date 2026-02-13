@@ -15,6 +15,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         KeeplinkSensor(coordinator, "firmware", "Firmware", "mdi:chip"),
         KeeplinkSensor(coordinator, "mac", "MAC Address", "mdi:network"),
         KeeplinkSensor(coordinator, "hardware", "Hardware Version", "mdi:expansion-card"),
+        # NEW Sensors
+        KeeplinkSensor(coordinator, "ip_address", "IP Address", "mdi:ip-network"),
+        KeeplinkSensor(coordinator, "netmask", "Netmask", "mdi:subnet-mask"),
+        KeeplinkSensor(coordinator, "gateway", "Gateway", "mdi:router"),
+        KeeplinkSensor(coordinator, "firmware_date", "Firmware Date", "mdi:calendar-clock"),
     ]
     
     async_add_entities(sensors)

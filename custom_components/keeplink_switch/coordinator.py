@@ -19,16 +19,16 @@ _LOGGER = logging.getLogger(__name__)
 class KeeplinkCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the switch."""
 
-    def __init__(self, hass, session, host, username, password):
+    def __init__(self, hass, session, host, username, password, scan_interval):
         """Initialize."""
         self.host = host
         self.username = username
         self.password = password
         self.session = session
-        self.mac_address = None # Store MAC specifically for device ID
-        self.device_info = {}   # Store static info for the registry
+        self.mac_address = None
+        self.device_info = {}
 
-        # Calculate Auth Hash
+        # Auth Hash Calculation
         auth_str = f"{username}{password}"
         self.auth_cookie = hashlib.md5(auth_str.encode()).hexdigest()
 
@@ -36,9 +36,11 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"Keeplink Switch ({host})",
-            update_interval=timedelta(seconds=60),
+            # Apply the custom scan interval here
+            update_interval=timedelta(seconds=scan_interval),
         )
 
+    # ... The rest of the file (_async_update_data and _parse_data) remains exactly the same ...
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -59,7 +61,6 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 
             data = self._parse_data(html)
             
-            # Save MAC and Info for Device Registry
             if "mac" in data:
                 self.mac_address = data["mac"]
                 self.device_info = {
@@ -93,4 +94,12 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     data["mac"] = value
                 elif "Hardware Version" in key:
                     data["hardware"] = value
+                elif "IP Address" in key:
+                    data["ip_address"] = value
+                elif "Netmask" in key:
+                    data["netmask"] = value
+                elif "Gateway" in key:
+                    data["gateway"] = value
+                elif "Firmware Date" in key:
+                    data["firmware_date"] = value
         return data
