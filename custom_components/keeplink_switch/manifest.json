@@ -6,5 +6,5 @@
   "documentation": "https://github.com/htlemos/keeplink-homeassistant",
   "requirements": ["beautifulsoup4==4.12.3"],
   "iot_class": "local_polling",
-  "version": "1.0.7"
+  "version": "1.0.8"
 }

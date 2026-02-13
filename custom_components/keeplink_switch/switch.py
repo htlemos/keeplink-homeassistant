@@ -11,8 +11,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     switches = []
     if "ports" in coordinator.data:
-        for port_num in coordinator.data["ports"]:
-            switches.append(KeeplinkPoESwitch(coordinator, port_num))
+        for port_num, port_data in coordinator.data["ports"].items():
+            # FIX: Only create PoE Switch if the port supports PoE (has 'enabled' state)
+            if "enabled" in port_data:
+                switches.append(KeeplinkPoESwitch(coordinator, port_num))
 
     async_add_entities(switches)
 

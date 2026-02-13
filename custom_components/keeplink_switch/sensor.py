@@ -26,10 +26,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     # Add Per-Port Sensors dynamically
     if "ports" in coordinator.data:
-        for port_num in coordinator.data["ports"]:
-            sensors.append(KeeplinkPortSensor(coordinator, port_num, "power"))
-            sensors.append(KeeplinkPortSensor(coordinator, port_num, "voltage"))
-            sensors.append(KeeplinkPortSensor(coordinator, port_num, "current"))
+        for port_num, port_data in coordinator.data["ports"].items():
+            # FIX: Only create PoE sensors if the port actually has PoE data (Key 'power' exists)
+            # This prevents Port 9 (SFP) from getting Voltage/Watts sensors
+            if "power" in port_data:
+                sensors.append(KeeplinkPortSensor(coordinator, port_num, "power"))
+                sensors.append(KeeplinkPortSensor(coordinator, port_num, "voltage"))
+                sensors.append(KeeplinkPortSensor(coordinator, port_num, "current"))
 
     async_add_entities(sensors)
 
@@ -79,7 +82,7 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{coordinator.mac_address}_port{port_num}_{metric}"
         self._attr_name = f"Keeplink Port {port_num} PoE {metric.capitalize()}"
         
-        # FEATURE: Disable these sensors by default
+        # Disabled by default to keep dashboard clean
         self._attr_entity_registry_enabled_default = False
         
         if metric == "power":
@@ -100,7 +103,6 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        # FIX: Now look for simple keys (power/voltage/current) because we fixed coordinator.py
         port_data = self.coordinator.data.get("ports", {}).get(self.port_num)
         if port_data:
             return port_data.get(self.metric)
