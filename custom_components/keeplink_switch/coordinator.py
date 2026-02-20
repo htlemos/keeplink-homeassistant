@@ -173,7 +173,8 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         soup = BeautifulSoup(html, 'html.parser')
         data = {"ports": {}}
         tables = soup.find_all('table')
-        target_table = tables[-1] # Usually the last table
+        if not tables: return data
+        target_table = tables[-1]
         rows = target_table.find_all('tr')
         for row in rows:
             cols = row.find_all('td')
@@ -183,11 +184,75 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 try: port_num = int(port_text.replace("Port ", ""))
                 except ValueError: continue
 
+                # Extract the Configured and Actual states
+                admin_state = cols[1].get_text(strip=True)
+                config_speed = cols[2].get_text(strip=True)
+                actual_speed = cols[3].get_text(strip=True)
+                config_flow = cols[4].get_text(strip=True)
+                actual_flow = cols[5].get_text(strip=True)
+
                 data["ports"][port_num] = {
-                    "speed": cols[3].get_text(strip=True),
-                    "flow_control": cols[5].get_text(strip=True)
+                    "admin_state": admin_state == "Enable",
+                    "config_speed": config_speed,
+                    "speed": actual_speed,
+                    "config_flow": config_flow == "On",
+                    "flow_control": actual_flow
                 }
         return data
+
+    async def async_set_port_settings(self, port_num, state=None, speed_val=None, flow=None):
+        """Send command to update Port Settings."""
+        port_id = port_num - 1
+        
+        # Get current settings to fill missing fields in the payload
+        current = self.data.get("ports", {}).get(port_num, {})
+        
+        # 1. Resolve State
+        if state is None:
+            new_state = "1" if current.get("admin_state", True) else "0"
+        else:
+            new_state = "1" if state else "0"
+            
+        # 2. Resolve Flow Control
+        if flow is None:
+            new_flow = "1" if current.get("config_flow", False) else "0"
+        else:
+            new_flow = "1" if flow else "0"
+            
+        # 3. Resolve Speed (Convert HTML text back to numeric value)
+        if speed_val is None:
+            speed_map = {
+                "Auto": "0", "10M Half": "1", "10M Full": "2", 
+                "100M Half": "3", "100M Full": "4", "1000M Full": "5", "1G Full": "5",
+                "2500M Full": "6", "2.5G Full": "6", "10G Full": "8"
+            }
+            curr_cfg = current.get("config_speed", "Auto")
+            new_speed = speed_map.get(curr_cfg, "0")
+        else:
+            new_speed = str(speed_val)
+
+        url = f"http://{self.host}/{ENDPOINT_PORT_SETTINGS}"
+        headers = {
+            "Referer": f"http://{self.host}/{ENDPOINT_PORT_SETTINGS}",
+            "User-Agent": "HomeAssistant/1.0"
+        }
+        cookies = {"admin": self.auth_cookie}
+        
+        # Full payload expected by the switch
+        payload = {
+            "portid": port_id,
+            "state": new_state,
+            "speed_duplex": new_speed,
+            "flow": new_flow,
+            "submit": "   Apply   ",
+            "cmd": "port"
+        }
+        
+        try:
+            await self.session.post(url, headers=headers, cookies=cookies, data=payload)
+            await self.async_request_refresh()
+        except aiohttp.ClientError as err:
+            _LOGGER.error(f"Failed to set port settings: {err}")
 
     def _parse_port_stats(self, html):
         """Parse port.cgi?page=stats"""
@@ -265,3 +330,5 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
             await self.async_request_refresh()
         except aiohttp.ClientError as err:
             _LOGGER.error(f"Failed to set PoE state for port {port_num}: {err}")
+
+    

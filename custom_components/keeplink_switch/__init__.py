@@ -8,7 +8,7 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_IN
 from .coordinator import KeeplinkCoordinator
 
 # UPDATE: Add "button" to the list
-PLATFORMS = ["sensor", "switch", "binary_sensor", "button"]
+PLATFORMS = ["sensor", "switch", "binary_sensor", "button", "select"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Keeplink Switch from a config entry."""
