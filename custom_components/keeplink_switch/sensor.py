@@ -1,7 +1,7 @@
 """Sensor platform for Keeplink Switch."""
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.const import UnitOfPower, UnitOfElectricPotential, UnitOfElectricCurrent
 
 from .const import DOMAIN
@@ -44,6 +44,10 @@ class KeeplinkSensor(CoordinatorEntity, SensorEntity):
         self._name = name
         self._icon = icon
         self._attr_unique_id = f"{coordinator.mac_address}_{key}"
+        
+        # Move all system identity sensors to the Diagnostic category
+        if key in ["model", "firmware", "mac", "hardware", "ip_address", "netmask", "gateway", "firmware_date"]:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def name(self): return f"Keeplink {self._name}"

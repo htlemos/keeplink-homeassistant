@@ -316,6 +316,29 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         except aiohttp.ClientError as err:
             _LOGGER.error(f"Failed to clear statistics: {err}")
 
+    async def async_reboot_switch(self):
+        """Send command to Reboot the switch."""
+        url = f"http://{self.host}/reboot.cgi"
+        
+        headers = {
+            "Referer": url,
+            "User-Agent": "HomeAssistant/1.0"
+        }
+        cookies = {"admin": self.auth_cookie}
+        
+        # Expected Payload from the HTML form
+        payload = {
+            "cmd": "reboot"
+        }
+        
+        try:
+            await self.session.post(url, headers=headers, cookies=cookies, data=payload)
+            _LOGGER.info(f"Reboot command sent to Keeplink Switch ({self.host})")
+            
+            # We don't force a data refresh here because the switch is going offline!
+        except aiohttp.ClientError as err:
+            _LOGGER.error(f"Failed to send reboot command: {err}")
+
     async def async_set_poe_state(self, port_num, state):
         """Set PoE State."""
         port_id = port_num - 1 
