@@ -19,13 +19,37 @@ async def async_setup_entry(hass, entry, async_add_entities):
             # 2. Flow Control Switch (Applies to all ports)
             switches.append(KeeplinkPortFlowSwitch(coordinator, port_num))
             
-            # 3. PoE Switch (Only for ports that have PoE data)
+            # 3. PoE Switch (Only for ports that support PoE)
             if "enabled" in port_data:
                 switches.append(KeeplinkPoESwitch(coordinator, port_num))
 
     async_add_entities(switches)
 
-# ... (Keep your existing KeeplinkPoESwitch class here) ...
+class KeeplinkPoESwitch(CoordinatorEntity, SwitchEntity):
+    """Representation of a Port PoE Switch."""
+    def __init__(self, coordinator, port_num):
+        super().__init__(coordinator)
+        self.port_num = port_num
+        self._attr_unique_id = f"{coordinator.mac_address}_port{port_num}_poe_switch"
+        self._attr_name = f"Keeplink Port {port_num} PoE"
+        self._attr_icon = "mdi:ethernet"
+
+    @property
+    def is_on(self):
+        port_data = self.coordinator.data.get("ports", {}).get(self.port_num)
+        if port_data:
+            return port_data.get("enabled", False)
+        return False
+
+    async def async_turn_on(self, **kwargs):
+        await self.coordinator.async_set_poe_state(self.port_num, True)
+
+    async def async_turn_off(self, **kwargs):
+        await self.coordinator.async_set_poe_state(self.port_num, False)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self.coordinator.mac_address)})
 
 class KeeplinkPortAdminSwitch(CoordinatorEntity, SwitchEntity):
     """Representation of a Port Admin State Switch."""
