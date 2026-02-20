@@ -132,4 +132,87 @@ cards:
             ]]]
 
       # --- PORTS 2 to 8 (Using Anchors) ---
-      - type
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_2_link
+        name: P2
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_3_link
+        name: P3
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_4_link
+        name: P4
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_5_link
+        name: P5
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_6_link
+        name: P6
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_7_link
+        name: P7
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_8_link
+        name: P8
+        icon: mdi:ethernet
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+      # --- PORT 9 (SFP+) ---
+      - type: custom:button-card
+        entity: binary_sensor.keeplink_port_9_link
+        name: SFP+
+        icon: mdi:expansion-card
+        tooltip: *port_tooltip
+        styles: *port_style
+        custom_fields: *poe_field
+
+  # --- 3. STATS & CONTROLS ---
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.keeplink_poe_total_power
+        name: Total PoE Load
+        min: 0
+        max: 120
+        needle: true
+        severity:
+          green: 0
+          yellow: 60
+          red: 100
+      - type: button
+        entity: button.keeplink_clear_statistics
+        name: Clear Port Stats
+        icon: mdi:delete-sweep
+        show_name: true
+        show_state: false
