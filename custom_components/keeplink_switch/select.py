@@ -35,17 +35,25 @@ class KeeplinkPortSpeedSelect(CoordinatorEntity, SelectEntity):
 
         # Map UI dropdown strings to payload integers
         self._val_map = {
-            "Auto": 0, "10M/Half": 1, "10M/Full": 2, "100M/Half": 3, "100M/Full": 4, 
-            "1000M/Full": 5, "2500M/Full": 6, "10G/Full": 8
+            "Auto": 0, 
+            "10M/Half": 1, 
+            "10M/Full": 2, 
+            "100M/Half": 3, 
+            "100M/Full": 4, 
+            "1000M/Full": 5, 
+            "2500M/Full": 6, 
+            "10G/Full": 8
         }
         
-        # Map HTML text strings to our UI dropdown strings
+        # Map HTML text strings from the switch to our UI dropdown strings
         self._html_map = {
             "Auto": "Auto",
-            "10M Half": "10M/Half", "10M Full": "10M/Full",
-            "100M Half": "100M/Half", "100M Full": "100M/Full",
-            "1G Full": "1000M/Full", "1000M Full": "1000M/Full",
-            "2.5G Full": "2500M/Full", "2500M Full": "2500M/Full",
+            "10 Half": "10M/Half", 
+            "10 Full": "10M/Full",
+            "100 Half": "100M/Half", 
+            "100 Full": "100M/Full",
+            "1000Full": "1000M/Full",
+            "2.5G Full": "2500M/Full",
             "10G Full": "10G/Full"
         }
 
@@ -54,6 +62,8 @@ class KeeplinkPortSpeedSelect(CoordinatorEntity, SelectEntity):
         """Return the current selected option."""
         port_data = self.coordinator.data.get("ports", {}).get(self.port_num, {})
         cfg_speed = port_data.get("config_speed", "Auto")
+        
+        # Translate HTML string to UI String. Default to "Auto" if not found.
         return self._html_map.get(cfg_speed, "Auto")
 
     async def async_select_option(self, option: str) -> None:
