@@ -23,6 +23,27 @@ This integration transforms your web-managed switch into a fully controllable sm
   * A **Clear Statistics** button entity to reset all counters directly from Home Assistant.
 * **Dynamic Polling:** Configurable Scan Interval via the integration options (Cogwheel).
 
+## ✨ Features
+
+This integration transforms your web-managed switch into a fully controllable smart device in Home Assistant:
+
+* **System Information:** Live sensors for Model, Firmware, Hardware Version, MAC, IP, Netmask, Gateway, and Firmware Date.
+* **Port Link Status:** Binary sensors for every port showing Connected (Up) or Disconnected (Down).
+* **Port Configuration:** * Toggle Admin State (Enable/Disable port).
+  * Toggle Flow Control.
+  * Dropdown Select to force Speed/Duplex (Auto, 10M, 100M, 1G, 2.5G, 10G for SFP+).
+* **Power over Ethernet (PoE) Management:**
+  * Toggle PoE Power per port.
+  * Live sensors for Total PoE Power Consumption (W).
+  * Individual sensors per port for Power (W), Voltage (V), and Current (mA) (Disabled by default to keep your entity list clean).
+* **Switch Actions & Statistics:** * Tx/Rx Packets and Tx/Rx Errors are tracked as attributes on each port's Link sensor.
+  * A **Clear Statistics** button entity to reset all traffic counters.
+  * A **Reboot Device** button to safely restart the switch hardware directly from Home Assistant.
+* **Dual-Polling Engine:** Configure separate scan intervals for general switch data and rapid PoE power monitoring, optimizing performance without sacrificing accuracy.
+* **Energy Dashboard Ready (Left Riemann Sum):** Automatically calculates accumulated energy (kWh) from PoE wattage, fully compatible with Home Assistant's Long-Term Statistics (LTS) and Energy Dashboard.
+* **Built-in Utility Meters:** Optionally generate daily, monthly, and yearly cyclical energy sensors for both Total Switch PoE and Per-Port PoE consumption directly from the integration's options.
+* **Clean Device UI:** Entities are smartly sorted into standard, **Configuration**, and **Diagnostic** categories to keep your main dashboard clutter-free.
+
 ## Installation via HACS
 1. Go to HACS -> Integrations.
 2. Click the 3 dots in the top right corner -> **Custom repositories**.
