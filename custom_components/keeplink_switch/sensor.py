@@ -94,7 +94,12 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
         self.metric = metric
         self._attr_unique_id = f"{coordinator.mac_address}_port{port_num}_{metric}"
         self._attr_name = f"Keeplink Port {port_num} PoE {metric.capitalize()}"
+        
+        # Keep them disabled by default so we don't clutter the entity list
         self._attr_entity_registry_enabled_default = False
+        
+        # FIX: Tell Home Assistant to track these in Long-Term Statistics
+        self._attr_state_class = SensorStateClass.MEASUREMENT
         
         if metric == "power":
             self._attr_device_class = SensorDeviceClass.POWER
