@@ -4,10 +4,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, CONF_POE_SCAN_INTERVAL, DEFAULT_POE_SCAN_INTERVAL
 from .coordinator import KeeplinkCoordinator
 
-# UPDATE: Add "button" to the list
 PLATFORMS = ["sensor", "switch", "binary_sensor", "button", "select"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -15,6 +14,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     session = async_get_clientsession(hass)
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    poe_scan_interval = entry.data.get(CONF_POE_SCAN_INTERVAL, DEFAULT_POE_SCAN_INTERVAL)
 
     coordinator = KeeplinkCoordinator(
         hass, 
@@ -22,7 +22,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_HOST], 
         entry.data[CONF_USERNAME], 
         entry.data[CONF_PASSWORD],
-        scan_interval
+        scan_interval,
+        poe_scan_interval # Pass the new parameter
     )
 
     await coordinator.async_config_entry_first_refresh()
