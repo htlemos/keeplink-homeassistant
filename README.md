@@ -19,23 +19,6 @@ This integration transforms your web-managed switch into a fully controllable sm
   * Toggle PoE Power per port.
   * Live sensors for Total PoE Power Consumption (W).
   * Individual sensors per port for Power (W), Voltage (V), and Current (mA) (Disabled by default to keep your entity list clean).
-* **Port Statistics:** * Tx/Rx Packets and Tx/Rx Errors are tracked as attributes on each port's Link sensor.
-  * A **Clear Statistics** button entity to reset all counters directly from Home Assistant.
-* **Dynamic Polling:** Configurable Scan Interval via the integration options (Cogwheel).
-
-## ✨ Features
-
-This integration transforms your web-managed switch into a fully controllable smart device in Home Assistant:
-
-* **System Information:** Live sensors for Model, Firmware, Hardware Version, MAC, IP, Netmask, Gateway, and Firmware Date.
-* **Port Link Status:** Binary sensors for every port showing Connected (Up) or Disconnected (Down).
-* **Port Configuration:** * Toggle Admin State (Enable/Disable port).
-  * Toggle Flow Control.
-  * Dropdown Select to force Speed/Duplex (Auto, 10M, 100M, 1G, 2.5G, 10G for SFP+).
-* **Power over Ethernet (PoE) Management:**
-  * Toggle PoE Power per port.
-  * Live sensors for Total PoE Power Consumption (W).
-  * Individual sensors per port for Power (W), Voltage (V), and Current (mA) (Disabled by default to keep your entity list clean).
 * **Switch Actions & Statistics:** * Tx/Rx Packets and Tx/Rx Errors are tracked as attributes on each port's Link sensor.
   * A **Clear Statistics** button entity to reset all traffic counters.
   * A **Reboot Device** button to safely restart the switch hardware directly from Home Assistant.
