@@ -43,6 +43,8 @@ This integration transforms your web-managed switch into a fully controllable sm
 5. Enter Username/Password (Default is `admin`/`admin`).
 6. *Optional:* Click the **Configure** (Cogwheel) icon on the integration later to change your credentials or adjust the polling Scan Interval.
 
+> **🎨 Note on Integration Branding:** > Custom icons and logos for this integration will automatically display in your UI if you are running **Home Assistant 2026.3.0** or newer, utilizing the new local Brands Proxy API!
+
 ---
 
 ## 🎨 Custom Dashboard layout
