@@ -2,6 +2,8 @@
 
 Custom component to integrate Keeplink / Horaco / Sodola 2.5G Web Managed Switches into Home Assistant.
 
+*Co-piloted by Gemini AI 🤖*
+
 ## Supported Devices
 * KP-9000-9XHPML-X-AC
 * (Likely works with other Realtek-based Web Managed switches)
