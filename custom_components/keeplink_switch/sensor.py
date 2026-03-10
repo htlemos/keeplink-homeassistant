@@ -71,13 +71,25 @@ class KeeplinkSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def name(self): return f"Keeplink {self._name}"
+    
     @property
     def native_value(self): return self.coordinator.data.get(self._key)
+    
     @property
     def icon(self): return self._icon
+    
+    # THE FIX: Bring back the rich device information!
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self.coordinator.mac_address)})
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.coordinator.mac_address)},
+            name=f"Keeplink Switch ({self.coordinator.host})",
+            manufacturer="Keeplink",
+            model=self.coordinator.device_info.get("model", "Unknown Model"),
+            sw_version=self.coordinator.device_info.get("sw_version", "Unknown"),
+            hw_version=self.coordinator.device_info.get("hw_version", "Unknown"),
+            configuration_url=f"http://{self.coordinator.host}",
+        )
 
 class KeeplinkPoETotalSensor(KeeplinkSensor):
     def __init__(self, coordinator):
