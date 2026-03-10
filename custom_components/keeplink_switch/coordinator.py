@@ -60,11 +60,8 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from API endpoints smartly based on time."""
         current_time = time.time()
-        
-        # Load existing data so we don't overwrite attributes we aren't fetching this cycle
         data = copy.deepcopy(self.data) if self.data else {"ports": {}}
 
-        # Check if we need to update General Data / PoE Data (added a 2s buffer for execution variance)
         update_general = (current_time - self.last_general_update) >= (self.scan_interval - 2)
         update_poe = (current_time - self.last_poe_update) >= (self.poe_scan_interval - 2)
 
@@ -80,34 +77,23 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 # --- POE DATA FETCH ---
                 if update_poe:
                     _LOGGER.debug(f"Fetching PoE Data for {self.host}")
-                    
-                    # 1. Fetch Total System PoE Power
                     poe_sys_data = await self._fetch_page(ENDPOINT_PSE_SYSTEM, headers, cookies, self._parse_pse_system)
                     data.update(poe_sys_data)
 
-                    # 2. Fetch Per-Port PoE Data
                     poe_port_data = await self._fetch_page(ENDPOINT_PSE_PORT, headers, cookies, self._parse_pse_port)
                     self._deep_merge_ports(data, poe_port_data)
-                    
-                    # Update our timer
                     self.last_poe_update = current_time
 
                 # --- GENERAL DATA FETCH ---
                 if update_general:
                     _LOGGER.debug(f"Fetching General Data for {self.host}")
-                    
-                    # 1. Fetch System Info (Firmware, MAC, IP, etc.)
                     data.update(await self._fetch_page(ENDPOINT_INFO, headers, cookies, self._parse_info))
                     
-                    # 2. Fetch Port Settings (Speed/Duplex/Flow Control)
                     settings_data = await self._fetch_page(ENDPOINT_PORT_SETTINGS, headers, cookies, self._parse_port_settings)
                     self._deep_merge_ports(data, settings_data)
 
-                    # 3. Fetch Port Stats (Link Status, Tx/Rx Packets, Errors)
                     stats_data = await self._fetch_page(ENDPOINT_PORT_STATS, headers, cookies, self._parse_port_stats)
                     self._deep_merge_ports(data, stats_data)
-                    
-                    # Update our timer
                     self.last_general_update = current_time
 
                     # Build Device Info once MAC is confirmed
@@ -119,6 +105,10 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                             "sw_version": data.get("firmware", "Unknown"),
                             "hw_version": data.get("hardware", "Unknown"),
                         }
+                    
+                    # THE FIX: Prevent setup if the switch returned bad/empty data during boot
+                    if not self.mac_address:
+                        raise UpdateFailed("MAC address not found. The switch is likely still booting.")
             
             return data
 
@@ -136,13 +126,30 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     main_data["ports"][port] = {}
                 main_data["ports"][port].update(info)
 
+    # --- NEW: Explicit Login Handler ---
+    async def _async_login(self):
+        """Perform an explicit login action. Required by some firmwares after a power loss."""
+        url = f"http://{self.host}/login.cgi"
+        payload = {"password": self.password} 
+        try:
+            await self.session.post(url, data=payload)
+        except Exception as e:
+            _LOGGER.debug(f"Explicit login attempt failed: {e}")
+
     async def _fetch_page(self, endpoint, headers, cookies, parser_func):
         """Helper to fetch and parse a single page."""
         url = f"http://{self.host}/{endpoint}"
         response = await self.session.get(url, headers=headers, cookies=cookies)
         
+        # THE FIX: If the switch lost its session and redirects us to login
         if "login.cgi" in str(response.url): 
-            raise ConfigEntryAuthFailed("Authentication failed.")
+            _LOGGER.warning(f"Switch {self.host} requested login. Attempting to re-authenticate.")
+            await self._async_login()
+            
+            # Try fetching the page one more time after logging in
+            response = await self.session.get(url, headers=headers, cookies=cookies)
+            if "login.cgi" in str(response.url):
+                raise ConfigEntryAuthFailed("Authentication failed even after explicit login.")
             
         html = await response.text()
         return parser_func(html)
