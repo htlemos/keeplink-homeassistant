@@ -126,33 +126,54 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     main_data["ports"][port] = {}
                 main_data["ports"][port].update(info)
 
-    # --- NEW: Explicit Login Handler ---
     async def _async_login(self):
         """Perform an explicit login action. Required by some firmwares after a power loss."""
+        _LOGGER.debug(f"Attempting explicit login to establish session on {self.host}")
         url = f"http://{self.host}/login.cgi"
-        payload = {"password": self.password} 
+        
+        # Some of these switches expect the password in a specific field 
+        # and a 'submit' or 'cmd' parameter to actually 'unlock' the API.
+        payload = {
+            "username": self.username,
+            "password": self.password,
+            "submit": "Login", # Common in Realtek web UIs
+            "cmd": "login"
+        } 
+        
         try:
-            await self.session.post(url, data=payload)
+            # We send this without cookies first to get a fresh session
+            async with self.session.post(url, data=payload, timeout=10) as response:
+                await response.text()
+                _LOGGER.info(f"Explicit login command sent to {self.host}")
         except Exception as e:
-            _LOGGER.debug(f"Explicit login attempt failed: {e}")
+            _LOGGER.error(f"Explicit login attempt failed for {self.host}: {e}")
 
     async def _fetch_page(self, endpoint, headers, cookies, parser_func):
-        """Helper to fetch and parse a single page."""
+        """Helper to fetch and parse a single page with auto-login recovery."""
         url = f"http://{self.host}/{endpoint}"
-        response = await self.session.get(url, headers=headers, cookies=cookies)
         
-        # THE FIX: If the switch lost its session and redirects us to login
-        if "login.cgi" in str(response.url): 
-            _LOGGER.warning(f"Switch {self.host} requested login. Attempting to re-authenticate.")
-            await self._async_login()
+        try:
+            response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
             
-            # Try fetching the page one more time after logging in
-            response = await self.session.get(url, headers=headers, cookies=cookies)
+            # If we are redirected to login.cgi or the response contains "login"
+            # it means our cookie is invalid or the switch just rebooted.
+            if "login.cgi" in str(response.url) or response.status == 401:
+                _LOGGER.warning(f"Switch {self.host} session expired or locked. Retrying with explicit login.")
+                await self._async_login()
+                
+                # Retry the original request ONE time after the login attempt
+                response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
+                
             if "login.cgi" in str(response.url):
-                raise ConfigEntryAuthFailed("Authentication failed even after explicit login.")
-            
-        html = await response.text()
-        return parser_func(html)
+                # If we're still stuck at login, the switch isn't ready or auth is wrong
+                raise ConfigEntryAuthFailed(f"Authentication failed on {self.host} after reboot recovery attempt.")
+
+            html = await response.text()
+            return parser_func(html)
+
+        except aiohttp.ClientError as err:
+            _LOGGER.error(f"Network error fetching {endpoint} from {self.host}: {err}")
+            raise UpdateFailed(f"Communication error: {err}")
 
     # -------------------------------------------------------------------------
     # PARSERS (Reading data from the switch)

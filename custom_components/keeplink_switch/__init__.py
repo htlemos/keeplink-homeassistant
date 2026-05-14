@@ -26,6 +26,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         poe_scan_interval # Pass the new parameter
     )
 
+    # Attempt an initial login to "wake up" the switch web server
+    await coordinator._async_login()
+
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
