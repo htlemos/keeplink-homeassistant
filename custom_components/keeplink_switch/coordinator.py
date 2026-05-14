@@ -159,15 +159,8 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
         url = f"http://{self.host}/{endpoint}"
         response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
         
-        # We no longer raise Auth errors here. 
-        # If the switch redirects us to login.cgi, the parser will simply return {} 
-        # which safely triggers the _async_login recovery in the main loop!
         html = await response.text()
         return parser_func(html)
-
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Network error fetching {endpoint} from {self.host}: {err}")
-            raise UpdateFailed(f"Communication error: {err}")
 
     # -------------------------------------------------------------------------
     # PARSERS (Reading data from the switch)
