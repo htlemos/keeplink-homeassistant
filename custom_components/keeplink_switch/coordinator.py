@@ -76,7 +76,6 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 
                 # --- POE DATA FETCH ---
                 if update_poe:
-                    _LOGGER.debug(f"Fetching PoE Data for {self.host}")
                     poe_sys_data = await self._fetch_page(ENDPOINT_PSE_SYSTEM, headers, cookies, self._parse_pse_system)
                     data.update(poe_sys_data)
 
@@ -86,9 +85,19 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
 
                 # --- GENERAL DATA FETCH ---
                 if update_general:
-                    _LOGGER.debug(f"Fetching General Data for {self.host}")
-                    data.update(await self._fetch_page(ENDPOINT_INFO, headers, cookies, self._parse_info))
+                    # 1. Fetch System Info
+                    info_data = await self._fetch_page(ENDPOINT_INFO, headers, cookies, self._parse_info)
                     
+                    # RECOVERY LOGIC: If we didn't get a MAC, the switch might be locked/rebooted.
+                    if "mac" not in info_data:
+                        _LOGGER.warning(f"MAC not found on {self.host}. Attempting auto-login recovery...")
+                        await self._async_login(headers, cookies)
+                        # Try fetching one more time after "waking up" the switch
+                        info_data = await self._fetch_page(ENDPOINT_INFO, headers, cookies, self._parse_info)
+
+                    data.update(info_data)
+                    
+                    # 2. Fetch Port Settings & Stats
                     settings_data = await self._fetch_page(ENDPOINT_PORT_SETTINGS, headers, cookies, self._parse_port_settings)
                     self._deep_merge_ports(data, settings_data)
 
@@ -105,10 +114,9 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                             "sw_version": data.get("firmware", "Unknown"),
                             "hw_version": data.get("hardware", "Unknown"),
                         }
-                    
-                    # THE FIX: Prevent setup if the switch returned bad/empty data during boot
-                    if not self.mac_address:
-                        raise UpdateFailed("MAC address not found. The switch is likely still booting.")
+                    else:
+                        # If it STILL fails after the recovery attempt, gracefully pause.
+                        raise UpdateFailed("MAC address not found. Switch is still booting or auth rejected.")
             
             return data
 
@@ -126,50 +134,36 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     main_data["ports"][port] = {}
                 main_data["ports"][port].update(info)
 
-    async def _async_login(self):
-        """Perform an explicit login action. Required by some firmwares after a power loss."""
-        _LOGGER.debug(f"Attempting explicit login to establish session on {self.host}")
+    async def _async_login(self, headers, cookies):
+        """Silently ping the login endpoints to wake up the Realtek web server."""
         url = f"http://{self.host}/login.cgi"
         
-        # Some of these switches expect the password in a specific field 
-        # and a 'submit' or 'cmd' parameter to actually 'unlock' the API.
+        # Realtek firmwares vary, so we send a universal payload to trigger the session backend
         payload = {
-            "username": self.username,
-            "password": self.password,
-            "submit": "Login", # Common in Realtek web UIs
+            "password": self.password, 
+            "pass": self.password, 
+            "submit": "Login", 
             "cmd": "login"
         } 
         
         try:
-            # We send this without cookies first to get a fresh session
-            async with self.session.post(url, data=payload, timeout=10) as response:
-                await response.text()
-                _LOGGER.info(f"Explicit login command sent to {self.host}")
+            # Send the POST to simulate clicking 'Login'
+            await self.session.post(url, data=payload, headers=headers, cookies=cookies, timeout=5)
+            # Send a GET to simulate landing on the page (wakes up some older firmwares)
+            await self.session.get(url, headers=headers, cookies=cookies, timeout=5)
         except Exception as e:
-            _LOGGER.error(f"Explicit login attempt failed for {self.host}: {e}")
+            _LOGGER.debug(f"Auto-login ping failed (this is usually safe to ignore): {e}")
 
     async def _fetch_page(self, endpoint, headers, cookies, parser_func):
-        """Helper to fetch and parse a single page with auto-login recovery."""
+        """Helper to fetch and parse a single page smoothly."""
         url = f"http://{self.host}/{endpoint}"
+        response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
         
-        try:
-            response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
-            
-            # If we are redirected to login.cgi or the response contains "login"
-            # it means our cookie is invalid or the switch just rebooted.
-            if "login.cgi" in str(response.url) or response.status == 401:
-                _LOGGER.warning(f"Switch {self.host} session expired or locked. Retrying with explicit login.")
-                await self._async_login()
-                
-                # Retry the original request ONE time after the login attempt
-                response = await self.session.get(url, headers=headers, cookies=cookies, allow_redirects=True)
-                
-            if "login.cgi" in str(response.url):
-                # If we're still stuck at login, the switch isn't ready or auth is wrong
-                raise ConfigEntryAuthFailed(f"Authentication failed on {self.host} after reboot recovery attempt.")
-
-            html = await response.text()
-            return parser_func(html)
+        # We no longer raise Auth errors here. 
+        # If the switch redirects us to login.cgi, the parser will simply return {} 
+        # which safely triggers the _async_login recovery in the main loop!
+        html = await response.text()
+        return parser_func(html)
 
         except aiohttp.ClientError as err:
             _LOGGER.error(f"Network error fetching {endpoint} from {self.host}: {err}")
