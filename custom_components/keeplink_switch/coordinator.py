@@ -135,24 +135,49 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                 main_data["ports"][port].update(info)
 
     async def _async_login(self, headers, cookies):
-        """Silently ping the login endpoints to wake up the Realtek web server."""
-        url = f"http://{self.host}/login.cgi"
+        """Simulate an exact browser login sequence based on the switch's md5.js logic."""
+        import hashlib
         
-        # Realtek firmwares vary, so we send a universal payload to trigger the session backend
+        login_url = f"http://{self.host}/login.cgi"
+        
+        # 1. Replicate the exact JavaScript hashing: hex_md5(username + password)
+        auth_str = f"{self.username}{self.password}"
+        response_hash = hashlib.md5(auth_str.encode('utf-8')).hexdigest()
+        
+        # 2. Replicate the form fields exactly as they exist in the HTML form
         payload = {
-            "password": self.password, 
-            "pass": self.password, 
-            "submit": "Login", 
-            "cmd": "login"
-        } 
+            "username": self.username,
+            "password": self.password,
+            "language": "EN",
+            "Response": response_hash
+        }
+        
+        # 3. Replicate the JS cookie setting: document.cookie = "admin="+...
+        login_cookies = {"admin": response_hash}
+        
+        login_headers = {
+            "Host": self.host,
+            "Origin": f"http://{self.host}",
+            "Referer": f"http://{self.host}/login.cgi",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
         
         try:
-            # Send the POST to simulate clicking 'Login'
-            await self.session.post(url, data=payload, headers=headers, cookies=cookies, timeout=5)
-            # Send a GET to simulate landing on the page (wakes up some older firmwares)
-            await self.session.get(url, headers=headers, cookies=cookies, timeout=5)
+            _LOGGER.debug(f"Executing explicit POST login for {self.host} with Response Hash: {response_hash}")
+            
+            # Send the exact POST request the web browser sends
+            async with self.session.post(login_url, data=payload, headers=login_headers, cookies=login_cookies, timeout=5) as response:
+                await response.text()
+                
+            # After a successful POST, we do a GET to the root to initialize the switch's internal session frames
+            await self.session.get(f"http://{self.host}/", headers=login_headers, cookies=login_cookies, timeout=5)
+            
+            # Update the coordinator's auth cookie to the newly generated one
+            self.auth_cookie = response_hash
+            
         except Exception as e:
-            _LOGGER.debug(f"Auto-login ping failed (this is usually safe to ignore): {e}")
+            _LOGGER.warning(f"Auto-login sequence encountered an issue on {self.host}: {e}")
 
     async def _fetch_page(self, endpoint, headers, cookies, parser_func):
         """Helper to fetch and parse a single page smoothly."""
