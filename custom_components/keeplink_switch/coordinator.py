@@ -80,6 +80,11 @@ class KeeplinkCoordinator(DataUpdateCoordinator):
                     data.update(poe_sys_data)
 
                     poe_port_data = await self._fetch_page(ENDPOINT_PSE_PORT, headers, cookies, self._parse_pse_port)
+                    
+                    # THE FIX: Abort setup if PoE data is missing during a cold boot
+                    if not poe_port_data or len(poe_port_data) == 0:
+                        raise UpdateFailed("PoE controller is still booting and hasn't populated port data.")
+                        
                     self._deep_merge_ports(data, poe_port_data)
                     self.last_poe_update = current_time
 
