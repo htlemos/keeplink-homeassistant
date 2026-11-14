@@ -162,7 +162,7 @@ class KeeplinkPortSensor(CoordinatorEntity, SensorEntity):
 
 
 class KeeplinkTrunkGroupSensor(CoordinatorEntity, SensorEntity):
-    """Read-only diagnostic sensors for Trunk 1 and Trunk 2 Group configuration."""
+    """Read-only sensors for Trunk 1 and Trunk 2 Group configuration."""
 
     def __init__(self, coordinator, trunk_id, metric, label, icon):
         super().__init__(coordinator)
@@ -172,7 +172,6 @@ class KeeplinkTrunkGroupSensor(CoordinatorEntity, SensorEntity):
         clean_name = trunk_id.replace("Trunk", "Trunk ")
         self._attr_unique_id = f"{coordinator.mac_address}_{trunk_id.lower()}_{metric}"
         self._attr_name = f"Keeplink {clean_name} {label}"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self):

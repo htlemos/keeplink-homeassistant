@@ -3,6 +3,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, CONF_POE_SCAN_INTERVAL, DEFAULT_POE_SCAN_INTERVAL
 from .coordinator import KeeplinkCoordinator
@@ -35,7 +36,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Migrate v1.3.0 Trunk Group sensors from Diagnostic to primary Sensors section
+    ent_reg = er.async_get(hass)
+    for trunk_id in ("trunk1", "trunk2"):
+        for metric in ("type", "member_ports", "aggregated_ports"):
+            uid = f"{coordinator.mac_address}_{trunk_id}_{metric}"
+            entity_id = ent_reg.async_get_entity_id("sensor", DOMAIN, uid)
+            if entity_id:
+                ent_reg.async_update_entity(entity_id, entity_category=None)
+
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
 
     return True
 
