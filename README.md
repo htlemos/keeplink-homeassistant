@@ -247,6 +247,7 @@ cards:
         icon: mdi:delete-sweep
         show_name: true
         show_state: false
+```
 
 </details>
 
