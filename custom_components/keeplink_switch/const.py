@@ -8,7 +8,7 @@ CONF_PASSWORD = "password"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_POE_SCAN_INTERVAL = "poe_scan_interval"
 
-# NEW: Energy Configuration Constants
+# Energy Configuration Constants
 CONF_CREATE_TOTAL_ENERGY = "create_total_energy"
 CONF_CREATE_PORT_ENERGY = "create_port_energy"
 CONF_UTILITY_CYCLES = "utility_cycles"
@@ -21,6 +21,8 @@ DEFAULT_UTILITY_CYCLES = []
 
 # Endpoints
 ENDPOINT_INFO = "info.cgi"
+ENDPOINT_PANEL = "panel.cgi"
+ENDPOINT_TRUNK = "trunk.cgi?page=group"
 ENDPOINT_PSE_SYSTEM = "pse_system.cgi"
 ENDPOINT_PSE_PORT = "pse_port.cgi"
 ENDPOINT_PORT_SETTINGS = "port.cgi"
